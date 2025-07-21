@@ -50,7 +50,6 @@ dependencies = [
     "tzlocal",
     "fsspec",
     "retrying",
-    "git+https://github.com/dhananjay-mk/hops-aiomysql.git@bumpsa#egg=hopsworks_aiomysql[sa]",
     "opensearch-py>=1.1.0,<=2.4.2",
     "tqdm",
     "grpcio>=1.49.1,<2.0.0",         # ^1.49.1
