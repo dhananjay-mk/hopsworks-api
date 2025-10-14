@@ -34,7 +34,6 @@ import pandas as pd
 import tzlocal
 from hopsworks_common.core.constants import HAS_NUMPY, HAS_PANDAS
 from hsfs.constructor import query
-from hsfs.core import feature_group_api
 
 # in case importing in %%local
 from hsfs.core.vector_db_client import VectorDbClient
@@ -223,8 +222,6 @@ class Engine:
             read_options,
         )
 
-        self.reconcile_schema(hudi_fg_alias, read_options, hudi_engine_instance)
-
     def register_delta_temporary_table(
         self, delta_fg_alias, feature_store_id, feature_store_name, read_options
     ):
@@ -240,28 +237,6 @@ class Engine:
             delta_fg_alias,
             read_options,
         )
-
-        self.reconcile_schema(delta_fg_alias, read_options, delta_engine_instance)
-
-    def reconcile_schema(self, fg_alias, read_options, engine_instance):
-        if sorted(self._spark_session.table(fg_alias.alias).columns) != sorted(
-            [feature.name for feature in fg_alias.feature_group._features]
-            + hudi_engine.HudiEngine.HUDI_SPEC_FEATURE_NAMES
-            if fg_alias.feature_group.time_travel_format == "HUDI"
-            else []
-        ):
-            full_fg = feature_group_api.FeatureGroupApi().get(
-                feature_store_id=fg_alias.feature_group._feature_store_id,
-                name=fg_alias.feature_group.name,
-                version=fg_alias.feature_group.version,
-            )
-
-            self.update_table_schema(full_fg)
-
-            engine_instance.register_temporary_table(
-                fg_alias,
-                read_options,
-            )
 
     def _return_dataframe_type(self, dataframe, dataframe_type):
         if dataframe_type.lower() in ["default", "spark"]:
@@ -1379,13 +1354,25 @@ class Engine:
                 f"{prefix}.session.token",
                 storage_connector.session_token,
             )
-
-        # This is the name of the property as expected from the user, without the bucket name.
-        FS_S3_ENDPOINT = "fs.s3a.endpoint"
-        if FS_S3_ENDPOINT in storage_connector.arguments:
+        if storage_connector.region:
             self._spark_context._jsc.hadoopConfiguration().set(
-                f"{prefix}.endpoint",
-                storage_connector.spark_options().get(FS_S3_ENDPOINT),
+                f"{prefix}.endpoint.region",
+                storage_connector.region,
+            )
+
+        # Forward all user-specified fs.s3a.* options to Hadoop conf
+        for key, value in storage_connector.spark_options().items():
+            if not isinstance(key, str):
+                continue
+            if not key.startswith("fs.s3a."):
+                continue
+            if value is None:
+                continue
+            # Strip the leading 'fs.s3a.' so we can prefix with the connector specific prefix
+            suffix = key.split("fs.s3a.", 1)[1]
+            self._spark_context._jsc.hadoopConfiguration().set(
+                f"{prefix}.{suffix}",
+                str(value),
             )
 
     def _setup_adls_hadoop_conf(self, storage_connector, path):

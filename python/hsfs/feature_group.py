@@ -108,7 +108,6 @@ if HAS_NUMPY:
 if HAS_POLARS:
     import polars as pl
 
-
 _logger = logging.getLogger(__name__)
 
 
@@ -152,6 +151,7 @@ class FeatureGroupBase:
         storage_connector: Union[sc.StorageConnector, Dict[str, Any]] = None,
         ttl: Optional[Union[int, float, timedelta]] = None,
         ttl_enabled: Optional[bool] = None,
+        online_disk: Optional[bool] = None,
         **kwargs,
     ) -> None:
         """Initialize a feature group object.
@@ -175,6 +175,8 @@ class FeatureGroupBase:
             storage_connector: Storage connector configuration
             ttl: Time-to-live (TTL) configuration for this feature group
             ttl_enabled: Whether to enable time-to-live (TTL) for this feature group. Defaults to True if ttl is set.
+            online_disk: Whether to enable online disk storage for this feature group. Overrides online_config.table_space.
+                Defaults to using cluster wide configuration 'featurestore_online_tablespace' to identify tablespace for disk storage.
             **kwargs: Additional keyword arguments
         """
         self._version = version
@@ -206,6 +208,16 @@ class FeatureGroupBase:
             if isinstance(online_config, dict)
             else online_config
         )
+        if online_disk is not None:
+            if self._online_config is None:
+                # Make sure online config is initialized
+                self._online_config = OnlineConfig()
+
+            if online_disk:
+                self._online_config.table_space = self._variable_api.get_featurestore_online_tablespace()
+            else:
+                # An empty string is interpreted as don't set table space, while None uses the cluster default
+                self._online_config.table_space = ""
 
         if data_source:
             self._data_source = (
@@ -1935,6 +1947,11 @@ class FeatureGroupBase:
         self._feature_store = feature_store
 
     @property
+    def id(self) -> Optional[int]:
+        """Feature group id."""
+        return self._id
+
+    @property
     def name(self) -> Optional[str]:
         """Name of the feature group."""
         return self._name
@@ -2597,6 +2614,7 @@ class FeatureGroup(FeatureGroupBase):
         ] = None,
         ttl: Optional[Union[int, float, timedelta]] = None,
         ttl_enabled: Optional[bool] = None,
+        online_disk: Optional[bool] = None,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -2618,6 +2636,7 @@ class FeatureGroup(FeatureGroupBase):
             data_source=data_source,
             ttl=ttl,
             ttl_enabled=ttl_enabled,
+            online_disk=online_disk,
         )
 
         self._feature_store_name: Optional[str] = featurestore_name
@@ -2669,10 +2688,8 @@ class FeatureGroup(FeatureGroupBase):
             self._offline_backfill_every_hr = None
 
         else:
-            # initialized by user
-            # for python engine we always use stream feature group
-            if engine.get_type() == "python":
-                self._stream = True
+            # Set time travel format and streaming based on engine type and online status
+            self._init_time_travel_and_stream(time_travel_format, online_enabled)
 
             self.primary_key = primary_key
             self.foreign_key = foreign_key
@@ -2731,6 +2748,37 @@ class FeatureGroup(FeatureGroupBase):
                     self._transformation_functions
                 )
             )
+
+    def _init_time_travel_and_stream(
+        self, time_travel_format: Optional[str], online_enabled: bool
+    ) -> None:
+        """Initialize `self._time_travel_format` and `self._stream` for new objects.
+
+        Behavior mirrors the previous inline logic and depends on engine type,
+        provided `time_travel_format`, and `online_enabled`.
+        """
+        if time_travel_format is None:
+            if engine.get_type() == "python":
+                if online_enabled:
+                    self._time_travel_format = "HUDI"
+                    self._stream = True
+                else:
+                    self._time_travel_format = "DELTA"
+            else:
+                self._time_travel_format = "HUDI"
+
+        elif time_travel_format == "HUDI":
+            self._time_travel_format = "HUDI"
+            if engine.get_type() == "python":
+                self._stream = True
+
+        elif time_travel_format == "DELTA":
+            self._time_travel_format = "DELTA"
+            if online_enabled and engine.get_type() == "python":
+                self._stream = True
+
+        else:
+            self._time_travel_format = time_travel_format
 
     @staticmethod
     def _sort_transformation_functions(
@@ -4231,6 +4279,7 @@ class ExternalFeatureGroup(FeatureGroupBase):
         ] = None,
         ttl: Optional[Union[int, float, timedelta]] = None,
         ttl_enabled: Optional[bool] = None,
+        online_disk: Optional[bool] = None,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -4252,6 +4301,7 @@ class ExternalFeatureGroup(FeatureGroupBase):
             data_source=data_source,
             ttl=ttl,
             ttl_enabled=ttl_enabled,
+            online_disk=online_disk,
         )
 
         self._feature_store_name = featurestore_name
@@ -4746,7 +4796,8 @@ class SpineGroup(FeatureGroupBase):
                 great_expectations.core.ExpectationSuite,
             ]
         ] = None,
-        online_enabled: bool = False,
+        # spine groups are online enabled by default such that feature_view.get_feature_vector can be used
+        online_enabled: bool = True,
         href: Optional[str] = None,
         online_topic_name: Optional[str] = None,
         topic_name: Optional[str] = None,
@@ -4765,6 +4816,7 @@ class SpineGroup(FeatureGroupBase):
                 Dict[str, Any],
             ]
         ] = None,
+        online_disk: Optional[bool] = None,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -4781,6 +4833,7 @@ class SpineGroup(FeatureGroupBase):
             deprecated=deprecated,
             online_config=online_config,
             data_source=data_source,
+            online_disk=online_disk,
         )
 
         self._feature_store_name = featurestore_name
@@ -4935,4 +4988,5 @@ class SpineGroup(FeatureGroupBase):
             "spine": True,
             "topicName": self.topic_name,
             "deprecated": self.deprecated,
+            "onlineEnabled": self._online_enabled,
         }
