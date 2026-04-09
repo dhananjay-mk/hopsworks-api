@@ -76,7 +76,7 @@ class DeltaEngine:
         self._project_api = project_api.ProjectApi()
         self._setup_delta_rs()
 
-    _ALLOWED_OPERATIONS = ("insert", "upsert", "bulk_insert")
+    _ALLOWED_OPERATIONS = ("insert", "upsert")
 
     def save_delta_fg(
         self,
