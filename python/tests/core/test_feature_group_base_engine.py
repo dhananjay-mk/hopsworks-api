@@ -35,6 +35,28 @@ class TestFeatureGroupBaseEngine:
         # Assert
         assert mock_fg_api.return_value._delete.call_count == 1
 
+    def test_delete_forwards_force_and_delete_feature_views(self, mocker):
+        # Arrange
+        feature_store_id = 99
+
+        mock_fg_api = mocker.patch("hsfs.core.feature_group_api.FeatureGroupApi")
+
+        fg_base_engine = feature_group_base_engine.FeatureGroupBaseEngine(
+            feature_store_id=feature_store_id
+        )
+
+        # Act
+        # ExternalFeatureGroup and SpineGroup inherit _delete from the base engine,
+        # so the base must accept and forward the FeatureGroupBase.delete() kwargs.
+        fg_base_engine._delete(
+            feature_group=None, force=True, delete_feature_views=True
+        )
+
+        # Assert
+        mock_fg_api.return_value._delete.assert_called_once_with(
+            None, force=True, delete_feature_views=True
+        )
+
     def test_add_tag(self, mocker):
         # Arrange
         feature_store_id = 99
