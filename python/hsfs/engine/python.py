@@ -838,25 +838,24 @@ class Engine:
         if "count" in stat:
             content_dict["count"] = stat["count"]
         if dataType != "String":
-            if "25%" in stat:
+            # pandas emits NaN for the statistics of all-null or constant
+            # columns; skip those values so they are not serialized (NaN is
+            # not valid JSON and aborts the statistics registration)
+            if "25%" in stat and not pd.isna(stat["25%"]):
                 percentiles = [0] * 100
                 percentiles[24] = stat["25%"]
                 percentiles[49] = stat["50%"]
                 percentiles[74] = stat["75%"]
                 content_dict["approxPercentiles"] = percentiles
-            if "mean" in stat:
+            if "mean" in stat and not pd.isna(stat["mean"]):
                 content_dict["mean"] = stat["mean"]
-            if (
-                "mean" in stat
-                and "count" in stat
-                and isinstance(stat["mean"], numbers.Number)
-            ):
-                content_dict["sum"] = stat["mean"] * stat["count"]
-            if "max" in stat:
+                if "count" in stat and isinstance(stat["mean"], numbers.Number):
+                    content_dict["sum"] = stat["mean"] * stat["count"]
+            if "max" in stat and not pd.isna(stat["max"]):
                 content_dict["maximum"] = stat["max"]
             if "std" in stat and not pd.isna(stat["std"]):
                 content_dict["stdDev"] = stat["std"]
-            if "min" in stat:
+            if "min" in stat and not pd.isna(stat["min"]):
                 content_dict["minimum"] = stat["min"]
         if "unique" in stat:
             content_dict["approximateNumDistinctValues"] = stat["unique"]
@@ -1513,6 +1512,16 @@ class Engine:
         except ImportError:
             arrow_flight_client_imported = False
 
+        # The Query Service create-training-dataset action does not receive the
+        # training dataset's sink and always materializes to the default HopsFS
+        # location.
+        # If the training dataset targets an external connector or specifies a
+        # non-empty sink path, use the Spark materialization job instead.
+        has_user_supplied_sink = (
+            training_dataset.training_dataset_type == training_dataset.EXTERNAL
+            or bool(training_dataset.data_source and training_dataset.data_source.path)
+        )
+
         if (
             arrow_flight_client_imported
             and arrow_flight_client._is_query_supported(dataset, user_write_options)
@@ -1521,6 +1530,7 @@ class Engine:
             and len(feature_view_obj.transformation_functions) == 0
             and training_dataset.data_format == "parquet"
             and not transformation_context
+            and not has_user_supplied_sink
         ):
             query_obj, _ = dataset._prep_read(False, user_write_options)
             return util._run_with_loading_animation(
