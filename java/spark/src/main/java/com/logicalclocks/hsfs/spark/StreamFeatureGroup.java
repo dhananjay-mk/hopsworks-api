@@ -1158,9 +1158,11 @@ public class StreamFeatureGroup extends FeatureGroupBase<Dataset<Row>> {
    * Drops records present in the provided DataFrame from the offline table, and optionally from the online
    * store of an online-enabled feature group.
    *
-   * <p>When {@code deleteOnline} is true, {@code featureData} needs to carry only the primary key columns,
-   * matching the offline delete; any other columns are ignored for the online delete. Online delete is
-   * skipped with a warning for stream feature groups (planned for a future release).
+   * <p>{@code featureData} needs to carry the key columns the offline delete matches on: the primary key,
+   * plus the event time and any partition columns when the feature group has them. When {@code deleteOnline}
+   * is true, the online delete matches on the primary key alone and ignores every other column, so a value
+   * passed for a non-key feature has no effect on it. Online delete is skipped with a warning for stream
+   * feature groups (planned for a future release).
    *
    * @param featureData Spark DataFrame, RDD. Feature data to be deleted.
    * @param deleteOnline Also delete the records from the online store when the feature group is online-enabled.
@@ -1178,9 +1180,11 @@ public class StreamFeatureGroup extends FeatureGroupBase<Dataset<Row>> {
    * Drops records present in the provided DataFrame from the offline table, and optionally from the online
    * store of an online-enabled feature group.
    *
-   * <p>When {@code deleteOnline} is true, {@code featureData} needs to carry only the primary key columns,
-   * matching the offline delete; any other columns are ignored for the online delete. Online delete is
-   * skipped with a warning for stream feature groups (planned for a future release).
+   * <p>{@code featureData} needs to carry the key columns the offline delete matches on: the primary key,
+   * plus the event time and any partition columns when the feature group has them. When {@code deleteOnline}
+   * is true, the online delete matches on the primary key alone and ignores every other column, so a value
+   * passed for a non-key feature has no effect on it. Online delete is skipped with a warning for stream
+   * feature groups (planned for a future release).
    *
    * @param featureData Spark DataFrame, RDD. Feature data to be deleted.
    * @param writeOptions Additional write options as key-value pairs.

@@ -4709,7 +4709,8 @@ class FeatureGroup(FeatureGroupBase):
 
         By default only the offline table is affected.
         Set `delete_online` to also delete the records from the online store of an online-enabled feature group.
-        `delete_df` needs to carry only the primary key columns, matching the offline delete; any other columns are ignored for the online delete.
+        `delete_df` needs to carry the key columns the offline delete matches on: the primary key, plus `event_time` and any partition columns when the feature group has them.
+        The online delete matches on the primary key alone and ignores every other column, so a value passed for a non-key feature has no effect on it.
         Online delete is not supported for stream feature groups yet; it is skipped with a warning for them.
 
         Parameters:
