@@ -1994,7 +1994,13 @@ class Engine:
         # online store. `dataframe` needs to carry only the primary key: non-key
         # fields are filled with null so the record serializes.
         fill_values = kafka_engine._online_delete_fill_values(feature_group)
-        n_rows = len(dataframe)
+        n_rows = (
+            None
+            if offline_write_options.get("online_ingestion_options", {}).get(
+                "disable_online_ingestion_count", False
+            )
+            else len(dataframe)
+        )
         producer, headers, feature_writers, writer = kafka_engine._get_kafka_resources(
             feature_group,
             offline_write_options,

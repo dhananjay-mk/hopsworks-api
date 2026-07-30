@@ -604,8 +604,11 @@ public class SparkEngine extends EngineBase {
       throws FeatureStoreException, IOException {
     Map<String, String> kafkaConfig = SparkEngine.getInstance().getKafkaConfig(featureGroupBase, writeOptions);
     Dataset<Row> padded = padOnlineDeleteDataset(featureGroupBase, dataset);
+    Long numEntries = Boolean.parseBoolean(
+        writeOptions.getOrDefault("online_ingestion_options.disable_online_ingestion_count", "false"))
+        ? null : padded.count();
     onlineFeatureGroupToAvro(featureGroupBase, encodeComplexFeatures(featureGroupBase, padded))
-        .withColumn("headers", getHeader(featureGroupBase, padded.count(), writeOptions, "delete"))
+        .withColumn("headers", getHeader(featureGroupBase, numEntries, writeOptions, "delete"))
         .write()
         .format(Constants.KAFKA_FORMAT)
         .options(kafkaConfig)

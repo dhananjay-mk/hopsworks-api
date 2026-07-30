@@ -4051,6 +4051,7 @@ class FeatureGroup(FeatureGroupBase):
                     - `mark_online_rows`: `True` or `False` to filter rows for online ingestion based on event time and primary key deduplication, defaults to `True`.
                     - `disable_online_ingestion_count`: `True` or `False` to disable sending the total number of entries to the online ingestion tracking system, defaults to `False`.
                       When `True`, no batch size is known to the ingestion tracker so `wait_for_online_ingestion` will wait until `timeout` is reached.
+                      Combining it with `timeout` `0` waits forever, since neither the entry count nor the timeout can end the wait.
                 - key `start_offline_backfill` and value `True` or `False` to configure whether or not to start the materialization job to write data to the offline storage. `start_offline_backfill` is deprecated.
                   Use `start_offline_materialization` instead.
                 - key `start_offline_materialization` and value `True` or `False` to configure whether or not to start the materialization job to write data to the offline storage.
@@ -4292,6 +4293,7 @@ class FeatureGroup(FeatureGroupBase):
                     - `mark_online_rows`: `True` or `False` to filter rows for online ingestion based on event time and primary key deduplication, defaults to `True`.
                     - `disable_online_ingestion_count`: `True` or `False` to disable sending the total number of entries to the online ingestion tracking system, defaults to `False`.
                       When `True`, no batch size is known to the ingestion tracker so `wait_for_online_ingestion` will wait until `timeout` is reached.
+                      Combining it with `timeout` `0` waits forever, since neither the entry count nor the timeout can end the wait.
                 - key `start_offline_backfill` and value `True` or `False` to configure whether or not to start the materialization job to write data to the offline storage.
                   `start_offline_backfill` is deprecated.
                   Use `start_offline_materialization` instead.
@@ -4713,6 +4715,20 @@ class FeatureGroup(FeatureGroupBase):
         Parameters:
             delete_df: DataFrame containing records to be deleted.
             write_options: User provided write options.
+                - key `wait_for_online_ingestion` and value `True` or `False` to configure whether or not the call should return only after the online delete has been applied.
+                  By default it does not wait.
+                  Applies only when `delete_online` is `True`.
+                - key `online_ingestion_options` and value a dict to configure online ingestion behaviour.
+                  Supported keys:
+                    - `timeout`: seconds to wait for the online delete to complete, default `60`, set to `0` for indefinite.
+                      Applies only when `wait_for_online_ingestion` is `True`.
+                    - `period`: polling interval in seconds, default `1`.
+                      Applies only when `wait_for_online_ingestion` is `True`.
+                    - `disable_online_ingestion_count`: `True` or `False` to disable sending the total number of entries to the online ingestion tracking system, defaults to `False`.
+                      Use it to skip counting a large `delete_df` on the Spark engine, where the count is a separate pass over the data.
+                      When `True`, no batch size is known to the ingestion tracker so `wait_for_online_ingestion` will wait until `timeout` is reached.
+                      Combining it with `timeout` `0` waits forever, since neither the entry count nor the timeout can end the wait.
+                - key `internal_kafka` and value `True` or `False` in case you established connectivity from your Python environment to the internal advertised listeners of the Hopsworks Kafka Cluster.
             delete_online: Also delete the records from the online store when the feature group is online-enabled.
 
         Raises:
@@ -6014,6 +6030,7 @@ class ExternalFeatureGroup(FeatureGroupBase):
                     - `mark_online_rows`: `True` or `False` to filter rows for online ingestion based on event time and primary key deduplication, defaults to `True`.
                     - `disable_online_ingestion_count`: `True` or `False` to disable sending the total number of entries to the online ingestion tracking system, defaults to `False`.
                       When `True`, no batch size is known to the ingestion tracker so `wait_for_online_ingestion` will wait until `timeout` is reached.
+                      Combining it with `timeout` `0` waits forever, since neither the entry count nor the timeout can end the wait.
                 - key `kafka_producer_config` and value an object of type [properties](https://docs.confluent.io/platform/current/clients/librdkafka/html/md_CONFIGURATION.htmln) used to configure the Kafka client.
                   To optimize for throughput in high latency connection consider changing [producer properties](https://docs.confluent.io/cloud/current/client-apps/optimizing/throughput.html#producer).
                 - key `internal_kafka` and value `True` or `False` in case you established connectivity from you Python environment to the internal advertised listeners of the Hopsworks Kafka Cluster.

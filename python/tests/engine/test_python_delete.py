@@ -203,3 +203,29 @@ class TestDeleteDataframeKafka:
                 outf, fastavro.parse_schema(json.loads(AVRO_SCHEMA))
             )
         assert record == {"id": 7, "state": None, "measurement": None}
+
+    def test_entry_count_is_sent_by_default(self, mocker):
+        fg = self._make_feature_group(mocker)
+        mocker.patch("hsfs.core.kafka_engine._kafka_produce")
+        get_headers = mocker.patch(
+            "hsfs.core.kafka_engine._get_headers", return_value={}
+        )
+
+        python.Engine()._delete_dataframe_kafka(fg, pd.DataFrame({"id": [7, 8]}), {})
+
+        assert get_headers.call_args[0][1] == 2
+
+    def test_disable_online_ingestion_count_skips_the_entry_count(self, mocker):
+        fg = self._make_feature_group(mocker)
+        mocker.patch("hsfs.core.kafka_engine._kafka_produce")
+        get_headers = mocker.patch(
+            "hsfs.core.kafka_engine._get_headers", return_value={}
+        )
+
+        python.Engine()._delete_dataframe_kafka(
+            fg,
+            pd.DataFrame({"id": [7, 8]}),
+            {"online_ingestion_options": {"disable_online_ingestion_count": True}},
+        )
+
+        assert get_headers.call_args[0][1] is None

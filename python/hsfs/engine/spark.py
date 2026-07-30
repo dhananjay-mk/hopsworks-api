@@ -848,7 +848,14 @@ class Engine:
             serialized_df.withColumn(
                 "headers",
                 self._get_headers(
-                    feature_group, dataframe.count(), write_options, operation="delete"
+                    feature_group,
+                    None
+                    if write_options.get("online_ingestion_options", {}).get(
+                        "disable_online_ingestion_count", False
+                    )
+                    else dataframe.count(),
+                    write_options,
+                    operation="delete",
                 ),
             )
             .write.format(self.KAFKA_FORMAT)
