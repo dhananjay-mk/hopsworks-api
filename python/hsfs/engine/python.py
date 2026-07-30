@@ -2010,7 +2010,13 @@ class Engine:
             if isinstance(dataframe, pd.DataFrame):
                 row = row._asdict()
 
-            row = {**fill_values, **row}
+            # Build the tombstone from the primary key only: null every non-key
+            # field and keep just the caller's primary-key values. Any other columns
+            # in `delete_df` are ignored for the online delete (OnlineFS deletes by
+            # primary key and discards the values), so a stale or unserializable
+            # non-key value cannot fail the tombstone after the offline delete has
+            # already committed.
+            row = {**fill_values, **{pk: row[pk] for pk in feature_group.primary_key}}
             encoded_row = kafka_engine._encode_row(feature_writers, writer, row)
             key = "".join([str(row[pk]) for pk in sorted(feature_group.primary_key)])
 

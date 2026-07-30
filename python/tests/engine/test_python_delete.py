@@ -184,7 +184,7 @@ class TestDeleteDataframeKafka:
             )
         assert record == {"id": 7, "state": None, "measurement": None}
 
-    def test_extra_columns_override_null_fill(self, mocker):
+    def test_extra_non_key_columns_are_ignored(self, mocker):
         produced = {}
         mocker.patch(
             "hsfs.core.kafka_engine._kafka_produce",
@@ -196,8 +196,10 @@ class TestDeleteDataframeKafka:
             fg, pd.DataFrame({"id": [7], "state": ["nevada"]}), {}
         )
 
+        # The online delete is by primary key, so a non-key column the caller passes
+        # is ignored and serialized as null rather than overriding the tombstone fill.
         with BytesIO(produced["encoded_row"]) as outf:
             record = fastavro.schemaless_reader(
                 outf, fastavro.parse_schema(json.loads(AVRO_SCHEMA))
             )
-        assert record == {"id": 7, "state": "nevada", "measurement": None}
+        assert record == {"id": 7, "state": None, "measurement": None}

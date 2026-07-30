@@ -867,14 +867,17 @@ class Engine:
             )
 
     def _pad_online_delete_dataframe(self, feature_group, dataframe):
-        # Add every feature group column the caller did not pass as a typed null,
-        # so a primary-key-only `dataframe` still serializes against the full Avro
-        # schema. OnlineFS deletes by primary key and discards these values.
+        # Build the tombstone from the primary key only: keep the caller's primary-key
+        # columns and force every other feature group column to a typed null. Non-key
+        # columns are ignored for the online delete (OnlineFS deletes by primary key
+        # and discards the values), so overriding them here honors the remove_rows
+        # contract and prevents a stale or type-incompatible caller value from failing
+        # Avro serialization after the offline delete has already committed.
         from pyspark.sql.functions import lit
 
-        present = set(dataframe.columns)
+        primary_key = set(feature_group.primary_key)
         for field in json.loads(feature_group.avro_schema)["fields"]:
-            if field["name"] in present:
+            if field["name"] in primary_key:
                 continue
             dataframe = dataframe.withColumn(
                 field["name"], lit(None).cast(self._avro_to_spark_type(field["type"]))

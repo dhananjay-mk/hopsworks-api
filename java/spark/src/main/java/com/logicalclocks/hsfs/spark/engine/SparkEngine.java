@@ -614,18 +614,21 @@ public class SparkEngine extends EngineBase {
   }
 
   /**
-   * Adds every feature group column the caller did not pass as a typed null.
+   * Builds the delete tombstone from the primary key only: keeps the caller's primary-key columns
+   * and forces every other feature group column to a typed null.
    *
-   * <p>A primary-key-only dataset still serializes against the full feature group Avro schema;
-   * OnlineFS deletes by primary key and discards these values. Feature group schemas wrap every
-   * field in a {@code ["null", <type>]} union, so a null fill always serializes.
+   * <p>Non-key columns are ignored for the online delete (OnlineFS deletes by primary key and
+   * discards the values), so overriding them here honors the removeRows contract and prevents a
+   * stale or type-incompatible caller value from failing Avro serialization after the offline
+   * delete has already committed. Feature group schemas wrap every field in a
+   * {@code ["null", <type>]} union, so a null fill always serializes.
    */
   private Dataset<Row> padOnlineDeleteDataset(FeatureGroupBase featureGroupBase, Dataset<Row> dataset)
       throws FeatureStoreException, IOException {
-    Set<String> present = new HashSet<>(Arrays.asList(dataset.columns()));
+    Set<String> primaryKeys = new HashSet<>(featureGroupBase.getPrimaryKeys());
     Dataset<Row> padded = dataset;
     for (Schema.Field field : featureGroupBase.getDeserializedAvroSchema().getFields()) {
-      if (present.contains(field.name())) {
+      if (primaryKeys.contains(field.name())) {
         continue;
       }
       DataType sparkType = SchemaConverters.toSqlType(field.schema()).dataType();
