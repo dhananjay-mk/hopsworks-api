@@ -1164,8 +1164,8 @@ public class StreamFeatureGroup extends FeatureGroupBase<Dataset<Row>> {
    *
    * @param featureData Spark DataFrame, RDD. Feature data to be deleted.
    * @param deleteOnline Also delete the records from the online store when the feature group is online-enabled.
-   * @throws FeatureStoreException If deleteOnline is set and the feature group is not online-enabled or the
-   *                               backend does not support online deletes; or on other client/commit errors.
+   * @throws FeatureStoreException If deleteOnline is set and the feature group is not online-enabled;
+   *                               or on other client/commit errors.
    * @throws IOException Generic IO exception.
    * @throws ParseException In case it's unable to parse HUDI commit date string to date type.
    */
@@ -1185,8 +1185,8 @@ public class StreamFeatureGroup extends FeatureGroupBase<Dataset<Row>> {
    * @param featureData Spark DataFrame, RDD. Feature data to be deleted.
    * @param writeOptions Additional write options as key-value pairs.
    * @param deleteOnline Also delete the records from the online store when the feature group is online-enabled.
-   * @throws FeatureStoreException If deleteOnline is set and the feature group is not online-enabled or the
-   *                               backend does not support online deletes; or on other client/commit errors.
+   * @throws FeatureStoreException If deleteOnline is set and the feature group is not online-enabled;
+   *                               or on other client/commit errors.
    * @throws IOException Generic IO exception.
    * @throws ParseException In case it's unable to parse HUDI commit date string to date type.
    */
