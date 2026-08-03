@@ -54,7 +54,7 @@ class TestOnlineDeleteFillValues:
         assert kafka_engine._online_delete_fill_values(fg) == {"measurement": None}
 
 
-def _stream_online_fg(mocker):
+def _stream_online_fg(mocker, time_travel_format="DELTA"):
     mocker.patch("hopsworks_common.client._get_instance")
     fg = feature_group.FeatureGroup(
         name="test",
@@ -65,21 +65,35 @@ def _stream_online_fg(mocker):
         id=10,
         stream=True,
         online_enabled=True,
-        time_travel_format="DELTA",
+        time_travel_format=time_travel_format,
     )
     fg.primary_key = ["id"]
     return fg
 
 
-class TestRemoveRowsStreamGate:
-    def test_online_delete_skipped_for_stream_fg(self, mocker):
-        mocker.patch.object(FeatureGroupEngine, "_commit_delete")
+class TestRemoveRowsStreamFeatureGroup:
+    # ICEBERG alongside DELTA because _resolve_stream_python makes stream=True the default
+    # for ICEBERG on external clients, so it is the common stream case rather than an edge one.
+    @pytest.mark.parametrize("time_travel_format", ["DELTA", "ICEBERG"])
+    def test_online_delete_runs_for_stream_fg(self, mocker, time_travel_format):
+        mocker.patch("hsfs.engine._get_type", return_value="python")
+        offline = mocker.patch.object(FeatureGroupEngine, "_commit_delete")
+        online = mocker.patch.object(FeatureGroupEngine, "_delete_online_records")
+        fg = _stream_online_fg(mocker, time_travel_format)
+
+        fg.remove_rows(pd.DataFrame({"id": [2]}), delete_online=True)
+
+        offline.assert_called_once()
+        online.assert_called_once()
+
+    def test_offline_delete_only_by_default(self, mocker):
+        offline = mocker.patch.object(FeatureGroupEngine, "_commit_delete")
         online = mocker.patch.object(FeatureGroupEngine, "_delete_online_records")
         fg = _stream_online_fg(mocker)
 
-        with pytest.warns(UserWarning, match="stream feature groups"):
-            fg.remove_rows(pd.DataFrame({"id": [2]}), delete_online=True)
+        fg.remove_rows(pd.DataFrame({"id": [2]}))
 
+        offline.assert_called_once()
         online.assert_not_called()
 
 
@@ -115,9 +129,6 @@ class TestCommitDeleteRecordDeprecated:
         online = mocker.patch.object(FeatureGroupEngine, "_delete_online_records")
         remove_rows = mocker.spy(feature_group.FeatureGroup, "remove_rows")
         fg = _stream_online_fg(mocker)
-        # non-stream keeps this from hitting the stream-skip branch; the deprecated
-        # method must still warn and delegate.
-        fg.stream = False
         delete_df = pd.DataFrame({"id": [2]})
 
         with warnings.catch_warnings(record=True) as caught:

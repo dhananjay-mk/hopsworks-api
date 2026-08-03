@@ -4711,7 +4711,11 @@ class FeatureGroup(FeatureGroupBase):
         Set `delete_online` to also delete the records from the online store of an online-enabled feature group.
         `delete_df` needs to carry the key columns the offline delete matches on: the primary key, plus `event_time` and any partition columns when the feature group has them.
         The online delete matches on the primary key alone and ignores every other column, so a value passed for a non-key feature has no effect on it.
-        Online delete is not supported for stream feature groups yet; it is skipped with a warning for them.
+
+        Warning: Deleting a row a stream feature group has not materialized yet
+            The offline delete is applied to the offline table directly, while a stream feature group's inserts reach that table through the materialization job.
+            Deleting a row whose insert has not been materialized yet deletes nothing offline, and the materialization job then writes the row, so it stays in the offline table while the online store has it deleted.
+            Re-run the delete after the materialization job to reconcile the two stores.
 
         Parameters:
             delete_df: DataFrame containing records to be deleted.
@@ -4767,15 +4771,6 @@ class FeatureGroup(FeatureGroupBase):
         self._feature_group_engine._commit_delete(self, delete_df, write_options or {})
 
         if delete_online:
-            if self.stream:
-                warnings.warn(
-                    "delete_online was skipped: online delete is not supported for stream feature "
-                    "groups yet. The offline materialization (Hudi DeltaStreamer) reprocesses the "
-                    "delete tombstone and would re-insert the rows offline, so the online rows were "
-                    "NOT deleted. Support for stream feature groups is planned for a future release.",
-                    stacklevel=2,
-                )
-                return
             # Requires an OnlineFS (clusterj-onlinefs) that understands the
             # `operation: delete` header (the release shipping the OnlineFS delete
             # branch onward). Not runtime-gated: OnlineFS is not reachable from the

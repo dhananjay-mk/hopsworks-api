@@ -492,14 +492,6 @@ public class FeatureGroupEngine  extends FeatureGroupEngineBase {
         SparkEngine.getInstance().getSparkSession(), featureGroupBase, genericDataset, writeOptions);
 
     if (deleteOnline) {
-      if (featureGroupBase instanceof StreamFeatureGroup) {
-        FeatureGroupEngineBase.LOGGER.warn(
-            "deleteOnline was skipped: online delete is not supported for stream feature groups yet. "
-            + "The offline materialization (Hudi DeltaStreamer) reprocesses the delete tombstone and would "
-            + "re-insert the rows offline, so the online rows were NOT deleted. Support for stream feature "
-            + "groups is planned for a future release.");
-        return commit;
-      }
       // Requires an OnlineFS (clusterj-onlinefs) that understands the operation: delete header
       // (the release shipping the OnlineFS delete branch onward). Not runtime-gated: OnlineFS is
       // not reachable from the client, and the backend version is not its proxy since backend, SDK

@@ -939,8 +939,7 @@ public class FeatureGroup extends FeatureGroupBase<Dataset<Row>> {
    * <p>{@code featureData} needs to carry the key columns the offline delete matches on: the primary key,
    * plus the event time and any partition columns when the feature group has them. When {@code deleteOnline}
    * is true, the online delete matches on the primary key alone and ignores every other column, so a value
-   * passed for a non-key feature has no effect on it. Online delete is skipped with a warning for stream
-   * feature groups (planned for a future release).
+   * passed for a non-key feature has no effect on it.
    *
    * @param featureData Spark DataFrame, RDD. Feature data to be deleted.
    * @param deleteOnline Also delete the records from the online store when the feature group is online-enabled.
@@ -962,8 +961,7 @@ public class FeatureGroup extends FeatureGroupBase<Dataset<Row>> {
    * <p>{@code featureData} needs to carry the key columns the offline delete matches on: the primary key,
    * plus the event time and any partition columns when the feature group has them. When {@code deleteOnline}
    * is true, the online delete matches on the primary key alone and ignores every other column, so a value
-   * passed for a non-key feature has no effect on it. Online delete is skipped with a warning for stream
-   * feature groups (planned for a future release).
+   * passed for a non-key feature has no effect on it.
    *
    * @param featureData Spark DataFrame, RDD. Feature data to be deleted.
    * @param writeOptions Additional write options as key-value pairs.

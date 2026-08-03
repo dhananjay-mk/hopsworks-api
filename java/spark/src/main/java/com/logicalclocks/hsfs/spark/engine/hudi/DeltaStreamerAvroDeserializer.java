@@ -106,6 +106,12 @@ public class DeltaStreamerAvroDeserializer implements Deserializer<GenericRecord
   public GenericRecord deserialize(String topic, Headers headers, byte[] data) {
     if (subjectId.equals(getHeader(headers, "subjectId"))
         && featureGroupId.equals(getHeader(headers, "featureGroupId"))) {
+      // A delete tombstone is on the topic for OnlineFS only: removeRows has already applied the
+      // offline delete directly to the table, so materializing the tombstone re-inserts the key
+      // it deleted. Exact match, as in OnlineFsHandler.getRow - any other value is an upsert.
+      if ("delete".equals(getHeader(headers, "operation"))) {
+        return null;
+      }
       return deserialize(topic, data);
     }
     return null; // this job doesn't care about this entry, no point in deserializing
