@@ -887,6 +887,9 @@ public class FeatureGroup extends FeatureGroupBase<Dataset<Row>> {
    * }
    * </pre>
    *
+   * <p>When the feature group is online-enabled the records are deleted from the online store as
+   * well. Use {@link #removeRows(Dataset, boolean)} with {@code false} to delete offline only.
+   *
    * @param featureData Spark DataFrame, RDD. Feature data to be deleted.
    * @throws FeatureStoreException If Client is not connected to Hopsworks and/or no commit information was found for
    *                               this feature group;
@@ -895,7 +898,7 @@ public class FeatureGroup extends FeatureGroupBase<Dataset<Row>> {
    */
   public void removeRows(Dataset<Row> featureData)
       throws FeatureStoreException, IOException, ParseException {
-    featureGroupEngine.commitDelete(this, featureData, null);
+    featureGroupEngine.commitDelete(this, featureData, null, true);
   }
 
   /**
@@ -919,6 +922,9 @@ public class FeatureGroup extends FeatureGroupBase<Dataset<Row>> {
    * }
    * </pre>
    *
+   * <p>When the feature group is online-enabled the records are deleted from the online store as
+   * well. Use {@link #removeRows(Dataset, Map, boolean)} with {@code false} to delete offline only.
+   *
    * @param featureData Spark DataFrame, RDD. Feature data to be deleted.
    * @param writeOptions Additional write options as key-value pairs.
    * @throws FeatureStoreException If Client is not connected to Hopsworks and/or no commit information was found for
@@ -928,7 +934,7 @@ public class FeatureGroup extends FeatureGroupBase<Dataset<Row>> {
    */
   public void removeRows(Dataset<Row> featureData, Map<String, String> writeOptions)
       throws FeatureStoreException, IOException, ParseException {
-    featureGroupEngine.commitDelete(this, featureData, writeOptions);
+    featureGroupEngine.commitDelete(this, featureData, writeOptions, true);
   }
 
   /**
@@ -988,7 +994,9 @@ public class FeatureGroup extends FeatureGroupBase<Dataset<Row>> {
   @Deprecated
   public void commitDeleteRecord(Dataset<Row> featureData)
       throws FeatureStoreException, IOException, ParseException {
-    removeRows(featureData);
+    // Offline only: removeRows deletes from the online store too, this signature keeps the
+    // behaviour it had before the online delete existed.
+    removeRows(featureData, false);
   }
 
   /**
@@ -1004,7 +1012,8 @@ public class FeatureGroup extends FeatureGroupBase<Dataset<Row>> {
   @Deprecated
   public void commitDeleteRecord(Dataset<Row> featureData, Map<String, String> writeOptions)
       throws FeatureStoreException, IOException, ParseException {
-    removeRows(featureData, writeOptions);
+    // Offline only, as above.
+    removeRows(featureData, writeOptions, false);
   }
 
   /**

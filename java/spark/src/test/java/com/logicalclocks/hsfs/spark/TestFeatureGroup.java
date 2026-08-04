@@ -181,24 +181,25 @@ public class TestFeatureGroup {
 
   @Test
   @SuppressWarnings("deprecation")
-  public void testCommitDeleteRecordDelegatesToRemoveRows() throws Exception {
-    // The deprecated commitDeleteRecord overloads must delegate to removeRows.
+  public void testCommitDeleteRecordDelegatesToRemoveRowsOfflineOnly() throws Exception {
+    // The deprecated commitDeleteRecord overloads must delegate to removeRows, and the two
+    // without a deleteOnline argument must keep deleting from the offline table only, where
+    // removeRows itself now deletes from both stores.
     FeatureGroup featureGroup = Mockito.spy(new FeatureGroup(null, 1));
     Dataset<Row> df = Mockito.mock(Dataset.class);
     Map<String, String> writeOptions = new HashMap<>();
 
-    Mockito.doNothing().when(featureGroup).removeRows(df);
-    Mockito.doNothing().when(featureGroup).removeRows(df, writeOptions);
-    Mockito.doNothing().when(featureGroup).removeRows(df, true);
-    Mockito.doNothing().when(featureGroup).removeRows(df, writeOptions, true);
+    Mockito.doNothing().when(featureGroup).removeRows(Mockito.eq(df), Mockito.anyBoolean());
+    Mockito.doNothing().when(featureGroup)
+        .removeRows(Mockito.eq(df), Mockito.eq(writeOptions), Mockito.anyBoolean());
 
     featureGroup.commitDeleteRecord(df);
     featureGroup.commitDeleteRecord(df, writeOptions);
     featureGroup.commitDeleteRecord(df, true);
     featureGroup.commitDeleteRecord(df, writeOptions, true);
 
-    Mockito.verify(featureGroup).removeRows(df);
-    Mockito.verify(featureGroup).removeRows(df, writeOptions);
+    Mockito.verify(featureGroup).removeRows(df, false);
+    Mockito.verify(featureGroup).removeRows(df, writeOptions, false);
     Mockito.verify(featureGroup).removeRows(df, true);
     Mockito.verify(featureGroup).removeRows(df, writeOptions, true);
   }

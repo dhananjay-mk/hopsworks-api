@@ -4701,16 +4701,17 @@ class FeatureGroup(FeatureGroupBase):
         self,
         delete_df: TypeVar("pyspark.sql.DataFrame"),  # noqa: F821
         write_options: dict[Any, Any] | None = None,
-        delete_online: bool = False,
+        delete_online: bool = True,
     ) -> None:
         """Drops records present in the provided DataFrame and commits it as update to this Feature group.
 
         This method can only be used on feature groups stored as HUDI, DELTA, or ICEBERG.
 
-        By default only the offline table is affected.
-        Set `delete_online` to also delete the records from the online store of an online-enabled feature group.
+        Both stores of an online-enabled feature group are affected, mirroring [`insert`][hsfs.feature_group.FeatureGroup.insert], which writes to both.
+        Set `delete_online` to `False` to leave the online store untouched and delete offline only.
         `delete_df` needs to carry the key columns the offline delete matches on: the primary key, plus `event_time` and any partition columns when the feature group has them.
         The online delete matches on the primary key alone and ignores every other column, so a value passed for a non-key feature has no effect on it.
+        The online delete is tracked by the same online-ingestion record as an insert, and reported under its `UPSERTED` status: the record counts the rows OnlineFS applied and does not distinguish a delete from an upsert.
 
         Warning: Deleting a row a stream feature group has not materialized yet
             The offline delete is applied to the offline table directly, while a stream feature group's inserts reach that table through the materialization job.
@@ -4734,7 +4735,8 @@ class FeatureGroup(FeatureGroupBase):
                       When `True`, no batch size is known to the ingestion tracker so `wait_for_online_ingestion` will wait until `timeout` is reached.
                       Combining it with `timeout` `0` waits forever, since neither the entry count nor the timeout can end the wait.
                 - key `internal_kafka` and value `True` or `False` in case you established connectivity from your Python environment to the internal advertised listeners of the Hopsworks Kafka Cluster.
-            delete_online: Also delete the records from the online store when the feature group is online-enabled.
+            delete_online: Delete the records from the online store as well when the feature group is online-enabled.
+                Set it to `False` to delete from the offline table only.
 
         Raises:
             hopsworks.client.exceptions.RestAPIError: If the backend encounters an error when handling the request.
@@ -4792,11 +4794,16 @@ class FeatureGroup(FeatureGroupBase):
     ) -> None:
         """**Deprecated**, use [`remove_rows`][hsfs.feature_group.FeatureGroup.remove_rows] instead.
 
+        Unlike `remove_rows`, this method leaves the online store untouched unless `delete_online` is set,
+        keeping the offline-only behaviour it had before the online delete existed.
+
         Parameters:
             delete_df: DataFrame containing records to be deleted.
             write_options: User provided write options.
             delete_online: Also delete the records from the online store when the feature group is online-enabled.
         """
+        # Pass delete_online through positionally: this signature keeps the offline-only
+        # default for backwards compatibility, while remove_rows defaults it to True.
         return self.remove_rows(delete_df, write_options, delete_online)
 
     @public

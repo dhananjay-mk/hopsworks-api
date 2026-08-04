@@ -86,12 +86,36 @@ class TestRemoveRowsStreamFeatureGroup:
         offline.assert_called_once()
         online.assert_called_once()
 
-    def test_offline_delete_only_by_default(self, mocker):
+    def test_online_delete_by_default(self, mocker):
+        # remove_rows deletes from both stores by default, mirroring insert.
+        mocker.patch("hsfs.engine._get_type", return_value="python")
         offline = mocker.patch.object(FeatureGroupEngine, "_commit_delete")
         online = mocker.patch.object(FeatureGroupEngine, "_delete_online_records")
         fg = _stream_online_fg(mocker)
 
         fg.remove_rows(pd.DataFrame({"id": [2]}))
+
+        offline.assert_called_once()
+        online.assert_called_once()
+
+    def test_offline_delete_only_when_delete_online_is_false(self, mocker):
+        offline = mocker.patch.object(FeatureGroupEngine, "_commit_delete")
+        online = mocker.patch.object(FeatureGroupEngine, "_delete_online_records")
+        fg = _stream_online_fg(mocker)
+
+        fg.remove_rows(pd.DataFrame({"id": [2]}), delete_online=False)
+
+        offline.assert_called_once()
+        online.assert_not_called()
+
+    def test_deprecated_commit_delete_record_stays_offline_only(self, mocker):
+        # The deprecated alias keeps the offline-only behaviour it had before the online
+        # delete existed, so an existing caller does not start deleting online rows.
+        offline = mocker.patch.object(FeatureGroupEngine, "_commit_delete")
+        online = mocker.patch.object(FeatureGroupEngine, "_delete_online_records")
+        fg = _stream_online_fg(mocker)
+
+        fg.commit_delete_record(pd.DataFrame({"id": [2]}))
 
         offline.assert_called_once()
         online.assert_not_called()
