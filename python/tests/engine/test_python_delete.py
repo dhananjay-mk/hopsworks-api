@@ -174,7 +174,7 @@ class TestDeleteDataframeKafka:
         mocker.patch("hsfs.core.kafka_engine._get_kafka_config", return_value={})
         mocker.patch("hsfs.core.kafka_engine.Producer")
         # bypass the online-ingestion round trip in header setup; the delete leg
-        # adds the operation/storage headers itself.
+        # adds the operation header itself.
         mocker.patch("hsfs.core.kafka_engine._get_headers", return_value={})
         mocker.patch(
             "hsfs.feature_group.FeatureGroup.get_complex_features", return_value=[]
@@ -211,7 +211,9 @@ class TestDeleteDataframeKafka:
 
         assert produced["key"] == "7"
         assert produced["headers"]["operation"] == b"delete"
-        assert produced["headers"]["storage"] == b"1"
+        # No storage header. It gates the online leg alone ("0" makes OnlineFS skip the
+        # row), so it cannot mark a record online-only, and absent already ingests.
+        assert "storage" not in produced["headers"]
 
         with BytesIO(produced["encoded_row"]) as outf:
             record = fastavro.schemaless_reader(

@@ -2015,7 +2015,14 @@ class Engine:
             )
         )
 
-        row_headers = {**headers, "operation": b"delete", "storage": b"1"}
+        # `operation` is the only header the delete needs, and it is what both consumers
+        # read: OnlineFsHandler.getRow turns it into Row.delete, and the offline
+        # materialization drops the record so it does not re-insert the deleted key.
+        # No `storage` header: it gates the online leg alone ("0" makes OnlineFS skip the
+        # row, anything else or absent ingests it), so it cannot express "online only" and
+        # setting it to b"1" here only restated the default. The Spark and Java delete
+        # paths never set it either.
+        row_headers = {**headers, "operation": b"delete"}
 
         if isinstance(dataframe, pd.DataFrame):
             row_iterator = dataframe.itertuples(index=False)
