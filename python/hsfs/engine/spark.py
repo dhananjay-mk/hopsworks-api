@@ -880,61 +880,17 @@ class Engine:
         # and discards the values), so overriding them here honors the remove_rows
         # contract and prevents a stale or type-incompatible caller value from failing
         # Avro serialization after the offline delete has already committed.
-        from pyspark.sql.functions import lit
-
+        # The nulls have to be typed because _serialize_to_avro encodes complex
+        # features against their Avro schema, which an untyped null cannot satisfy.
         primary_key = set(feature_group.primary_key)
-        for field in json.loads(feature_group.avro_schema)["fields"]:
-            if field["name"] in primary_key:
-                continue
-            dataframe = dataframe.withColumn(
-                field["name"], lit(None).cast(self._avro_to_spark_type(field["type"]))
-            )
-        return dataframe
-
-    @staticmethod
-    def _avro_to_spark_type(avro_type):
-        # Map an Avro field type to the Spark type used to cast a null fill column.
-        # Feature group schemas wrap every field in a ["null", <type>] union.
-        from pyspark.sql import types as spark_types
-
-        if isinstance(avro_type, list):
-            non_null = [branch for branch in avro_type if branch != "null"]
-            return Engine._avro_to_spark_type(non_null[0])
-        if isinstance(avro_type, dict):
-            logical_type = avro_type.get("logicalType")
-            if logical_type == "date":
-                return spark_types.DateType()
-            if logical_type in ("timestamp-micros", "timestamp-millis"):
-                return spark_types.TimestampType()
-            complex_type = avro_type.get("type")
-            if complex_type == "array":
-                return spark_types.ArrayType(
-                    Engine._avro_to_spark_type(avro_type["items"])
-                )
-            if complex_type == "map":
-                return spark_types.MapType(
-                    spark_types.StringType(),
-                    Engine._avro_to_spark_type(avro_type["values"]),
-                )
-            if complex_type == "record":
-                return spark_types.StructType(
-                    [
-                        spark_types.StructField(
-                            f["name"], Engine._avro_to_spark_type(f["type"]), True
-                        )
-                        for f in avro_type["fields"]
-                    ]
-                )
-            return Engine._avro_to_spark_type(complex_type)
-        return {
-            "long": spark_types.LongType(),
-            "int": spark_types.IntegerType(),
-            "double": spark_types.DoubleType(),
-            "float": spark_types.FloatType(),
-            "boolean": spark_types.BooleanType(),
-            "string": spark_types.StringType(),
-            "bytes": spark_types.BinaryType(),
-        }.get(avro_type, spark_types.StringType())
+        return dataframe.select(
+            *[col(name) for name in feature_group.primary_key],
+            *[
+                lit(None).cast(_feature.type).alias(_feature.name)
+                for _feature in feature_group.columns
+                if _feature.name not in primary_key
+            ],
+        )
 
     def _get_headers(
         self,

@@ -41,7 +41,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -595,6 +595,10 @@ public class SparkEngine extends EngineBase {
    * The dataset needs to carry only the primary key: non-key columns are filled with null so the Avro
    * schema serializes.
    *
+   * <p>The deletes are tracked by the same online ingestion record as an insert, and reported under
+   * its {@code UPSERTED} status: the record counts the rows OnlineFS applied and does not
+   * distinguish a delete from an upsert.
+   *
    * @param featureGroupBase the online-enabled feature group
    * @param dataset the rows to delete
    * @param writeOptions kafka write options
@@ -628,16 +632,22 @@ public class SparkEngine extends EngineBase {
    */
   private Dataset<Row> padOnlineDeleteDataset(FeatureGroupBase featureGroupBase, Dataset<Row> dataset)
       throws FeatureStoreException, IOException {
-    Set<String> primaryKeys = new HashSet<>(featureGroupBase.getPrimaryKeys());
-    Dataset<Row> padded = dataset;
+    // LinkedHashSet, not HashSet: the set is what the projection is built from, so keep the
+    // declared key order rather than a hash order. FeatureGroupBase is used raw here, which
+    // erases getPrimaryKeys() to a raw List, so read the keys back off the typed set.
+    Set<String> primaryKeys = new LinkedHashSet<>(featureGroupBase.getPrimaryKeys());
+    List<Column> columns = new ArrayList<>();
+    for (String primaryKey : primaryKeys) {
+      columns.add(col(primaryKey));
+    }
     for (Schema.Field field : featureGroupBase.getDeserializedAvroSchema().getFields()) {
       if (primaryKeys.contains(field.name())) {
         continue;
       }
       DataType sparkType = SchemaConverters.toSqlType(field.schema()).dataType();
-      padded = padded.withColumn(field.name(), lit(null).cast(sparkType));
+      columns.add(lit(null).cast(sparkType).as(field.name()));
     }
-    return padded;
+    return dataset.select(columns.toArray(new Column[0]));
   }
 
   private Column getHeader(FeatureGroupBase featureGroup, Long numEntries, Map<String, String> options)

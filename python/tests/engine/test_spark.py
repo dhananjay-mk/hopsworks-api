@@ -2210,6 +2210,83 @@ class TestSpark:
         )
         mock_spark_engine_serialize_to_avro.assert_called_once()
 
+    def test_pad_online_delete_dataframe(self):
+        # Arrange
+        spark_engine = spark.Engine()
+
+        features = [
+            feature.Feature(name="id", type="bigint", primary=True),
+            feature.Feature(name="name", type="string"),
+            feature.Feature(name="scores", type="array<bigint>"),
+            feature.Feature(name="created", type="timestamp"),
+        ]
+        fg = feature_group.FeatureGroup(
+            name="test",
+            version=1,
+            featurestore_id=99,
+            primary_key=["id"],
+            partition_key=[],
+            id=10,
+            features=features,
+        )
+
+        delete_df = spark_engine._spark_session.createDataFrame(
+            pd.DataFrame(data={"id": [1, 2], "ignored": ["a", "b"]})
+        )
+
+        # Act
+        padded = spark_engine._pad_online_delete_dataframe(fg, delete_df)
+
+        # Assert - every feature is present with its declared type, non-key values are
+        # null, and a column the feature group does not have is dropped
+        assert padded.columns == ["id", "name", "scores", "created"]
+        assert {
+            field.name: field.dataType.simpleString() for field in padded.schema
+        } == {
+            "id": "bigint",
+            "name": "string",
+            "scores": "array<bigint>",
+            "created": "timestamp",
+        }
+        assert [row.asDict() for row in padded.orderBy("id").collect()] == [
+            {"id": 1, "name": None, "scores": None, "created": None},
+            {"id": 2, "name": None, "scores": None, "created": None},
+        ]
+
+    def test_pad_online_delete_dataframe_keeps_composite_primary_key(self):
+        # Arrange
+        spark_engine = spark.Engine()
+
+        features = [
+            feature.Feature(name="id", type="bigint", primary=True),
+            feature.Feature(name="region", type="string", primary=True),
+            feature.Feature(name="measurement", type="double"),
+        ]
+        fg = feature_group.FeatureGroup(
+            name="test",
+            version=1,
+            featurestore_id=99,
+            primary_key=["id", "region"],
+            partition_key=[],
+            id=10,
+            features=features,
+        )
+
+        delete_df = spark_engine._spark_session.createDataFrame(
+            pd.DataFrame(data={"id": [1], "region": ["eu"], "measurement": [3.5]})
+        )
+
+        # Act
+        padded = spark_engine._pad_online_delete_dataframe(fg, delete_df)
+
+        # Assert - both key columns keep the caller's values, and a value the caller
+        # passed for a non-key feature is overridden with null
+        assert padded.collect()[0].asDict() == {
+            "id": 1,
+            "region": "eu",
+            "measurement": None,
+        }
+
     def test_delete_online_dataframe_disable_online_ingestion_count(
         self, mocker, backend_fixtures
     ):
