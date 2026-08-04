@@ -4711,7 +4711,7 @@ class FeatureGroup(FeatureGroupBase):
         Set `delete_online` to `False` to leave the online store untouched and delete offline only.
         `delete_df` needs to carry the key columns the offline delete matches on: the primary key, plus `event_time` and any partition columns when the feature group has them.
         The online delete matches on the primary key alone and ignores every other column, so a value passed for a non-key feature has no effect on it.
-        The online delete is tracked by the same online-ingestion record as an insert, and reported under its `UPSERTED` status: the record counts the rows OnlineFS applied and does not distinguish a delete from an upsert.
+        The online delete is tracked by the same online-ingestion record as an insert, and reported under its `DELETED` status, so the removed rows are counted apart from written ones.
 
         Warning: Deleting a row a stream feature group has not materialized yet
             The offline delete is applied to the offline table directly, while a stream feature group's inserts reach that table through the materialization job.

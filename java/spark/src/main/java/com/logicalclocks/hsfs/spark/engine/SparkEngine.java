@@ -596,8 +596,7 @@ public class SparkEngine extends EngineBase {
    * schema serializes.
    *
    * <p>The deletes are tracked by the same online ingestion record as an insert, and reported under
-   * its {@code UPSERTED} status: the record counts the rows OnlineFS applied and does not
-   * distinguish a delete from an upsert.
+   * its {@code DELETED} status, so the removed rows are counted apart from written ones.
    *
    * @param featureGroupBase the online-enabled feature group
    * @param dataset the rows to delete
